@@ -18,13 +18,13 @@ Ugg boot can be installed by `go install github.com/kortschak/ugbt@latest`.
 
 Show the repo for an executable.
 ```
-$ ugbt repo $(which goimports)
+$ ugbt repo goimports
 https://cs.opensource.google/go/x/tools
 ```
 
 List all available released versions.
 ```
-$ ugbt list -all $(which goimports)
+$ ugbt list -all goimports
 v0.1.7  28 Sep 2021 22:34
 v0.1.6  17 Sep 2021 17:58
 v0.1.5  13 Jul 2021 20:15
@@ -41,7 +41,7 @@ $ go version -m $(which goimports) | grep -v dep
 $GOBIN/goimports: go1.17.3
 	path	golang.org/x/tools/cmd/goimports
 	mod	golang.org/x/tools	v0.1.6	h1:SIasE1FVIQOWz2GEAHFOmoW7xchJcqlucjSULTL0Ag4=
-$ ugbt install $(which goimports) latest
+$ ugbt install goimports latest
 $ go version -m $(which goimports) | grep -v dep
 $GOBIN/goimports: go1.17.3
 	path	golang.org/x/tools/cmd/goimports
@@ -52,13 +52,13 @@ $GOBIN/goimports: go1.17.3
 
 Show the repo for the tool chain.
 ```
-$ ugbt repo $(which go)
+$ ugbt repo go
 https://github.com/golang/go
 ```
 
 Install gotip.
 ```
-$ ugbt install $(which go) gotip
+$ ugbt install go gotip
 go tool available as gotip
 $ gotip version
 go version devel go1.18-a142d65 Sat Nov 27 19:49:32 2021 +0000 linux/amd64

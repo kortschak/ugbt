@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"runtime/debug"
 	"sort"
@@ -383,6 +384,12 @@ func (u *ugbt) version(ctx context.Context, exepath string) (pth, mod, version s
 		// command always lives at the root of the module.
 		return info.Path, info.Main.Path, info.Main.Version, nil
 	}
+
+	exepath, err = exec.LookPath(exepath)
+	if err != nil {
+		return "", "", "", err
+	}
+
 	var stdout bytes.Buffer
 	err = u.cmd(ctx, &stdout, nil, "version", "-m", exepath).Run()
 	if err != nil {
