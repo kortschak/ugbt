@@ -130,13 +130,14 @@ type list struct {
 }
 
 func (l *list) Name() string      { return "list" }
-func (l *list) Usage() string     { return "</path/to/go/executable>" }
+func (l *list) Usage() string     { return "[/path/to/go/executable]" }
 func (l *list) ShortHelp() string { return "runs the ugbt list command" }
 func (l *list) DetailedHelp(f *flag.FlagSet) {
 	fmt.Fprint(f.Output(), `
 The list command prints a list of available versions for the queried
 executable. If the -all flag is given, all versions including versions
-older that the current executable are printed.
+older that the current executable are printed. If an executable path is
+not provided, ugbt will print ugbt version information.
 
 `)
 	f.PrintDefaults()
@@ -144,13 +145,20 @@ older that the current executable are printed.
 
 // Run runs the ugbt list command.
 func (l *list) Run(ctx context.Context, args ...string) error {
-	if len(args) != 1 {
-		return errors.New("install requires one argument")
+	var exe string
+	switch len(args) {
+	case 0:
+		// Work on ugbt.
+	case 1:
+		exe = args[0]
+	default:
+		return errors.New("install requires zero or one argument")
 	}
+
 	const defaultFormat = "_2 Jan 2006 15:04"
 	format := defaultFormat
 
-	_, mod, current, err := l.version(ctx, args[0])
+	_, mod, current, err := l.version(ctx, exe)
 	if err != nil {
 		return err
 	}
@@ -195,14 +203,17 @@ type install struct {
 }
 
 func (i *install) Name() string      { return "install" }
-func (i *install) Usage() string     { return "</path/to/go/executable> <version>" }
+func (i *install) Usage() string     { return "[/path/to/go/executable] <version>" }
 func (i *install) ShortHelp() string { return "runs the ugbt install command" }
 func (i *install) DetailedHelp(f *flag.FlagSet) {
 	fmt.Fprint(f.Output(), `
 The install command reinstalls the executable at the provided path using
 go install. Any valid version may be used including "latest". See 'go help get'.
+If an executable path is not provided, ugbt will install the ugbt command
+at the requested version.
+
 If the executable is in the standard library, a golang.org/x/dl tool will
-be used to download the SDK. When installing the SDK "latest" refers to the
+be used to download the SDK. When installing the SDK, "latest" refers to the
 latest release. The "gotip" version will install the current development tip.
 
 `)
@@ -211,14 +222,22 @@ latest release. The "gotip" version will install the current development tip.
 
 // Run runs the ugbt install command.
 func (i *install) Run(ctx context.Context, args ...string) error {
-	if len(args) != 2 {
-		return errors.New("install requires two arguments")
+	var exe, version string
+	switch len(args) {
+	case 1:
+		version = args[0]
+	case 2:
+		exe = args[0]
+		version = args[1]
+	default:
+		return errors.New("install requires one or two arguments")
 	}
-	path, mod, _, err := i.version(ctx, args[0])
+
+	path, mod, _, err := i.version(ctx, exe)
 	if err != nil {
 		return err
 	}
-	return i.install(ctx, path, mod, args[1], i.Verbose, i.Commands)
+	return i.install(ctx, path, mod, version, i.Verbose, i.Commands)
 }
 
 // repo implements the repo command.
@@ -229,11 +248,12 @@ type repo struct {
 }
 
 func (r *repo) Name() string      { return "repo" }
-func (r *repo) Usage() string     { return "</path/to/go/executable>" }
+func (r *repo) Usage() string     { return "[/path/to/go/executable]" }
 func (r *repo) ShortHelp() string { return "runs the ugbt repo command" }
 func (r *repo) DetailedHelp(f *flag.FlagSet) {
 	fmt.Fprint(f.Output(), `
-The repo command prints the source repo for the executable.
+The repo command prints the source repo for the executable. If an executable
+path is not provided, ugbt will print the ugbt repo.
 
 `)
 	f.PrintDefaults()
@@ -241,10 +261,17 @@ The repo command prints the source repo for the executable.
 
 // Run runs the ugbt repo command.
 func (r *repo) Run(ctx context.Context, args ...string) error {
-	if len(args) != 1 {
-		return errors.New("repo requires one argument")
+	var exe string
+	switch len(args) {
+	case 0:
+		// Work on ugbt.
+	case 1:
+		exe = args[0]
+	default:
+		return errors.New("install requires zero or one argument")
 	}
-	_, mod, _, err := r.version(ctx, args[0])
+
+	_, mod, _, err := r.version(ctx, exe)
 	if err != nil {
 		return err
 	}
@@ -347,6 +374,15 @@ repo prints the source code repository for the executable.
 // version returns the Go package path, mod path and version of the an
 // executable.
 func (u *ugbt) version(ctx context.Context, exepath string) (pth, mod, version string, err error) {
+	if exepath == "" {
+		info, ok := debug.ReadBuildInfo()
+		if !ok {
+			return "", "", "", errors.New("could not read build info")
+		}
+		// info.Path is being abused here, but it will work if the ugbt
+		// command always lives at the root of the module.
+		return info.Path, info.Main.Path, info.Main.Version, nil
+	}
 	var stdout bytes.Buffer
 	err = u.cmd(ctx, &stdout, nil, "version", "-m", exepath).Run()
 	if err != nil {
