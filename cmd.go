@@ -241,6 +241,9 @@ The repo command prints the source repo for the executable.
 
 // Run runs the ugbt repo command.
 func (r *repo) Run(ctx context.Context, args ...string) error {
+	if len(args) != 1 {
+		return errors.New("repo requires one argument")
+	}
 	_, mod, _, err := r.version(ctx, args[0])
 	if err != nil {
 		return err
