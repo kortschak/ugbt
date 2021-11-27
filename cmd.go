@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"runtime/debug"
 	"sort"
@@ -25,6 +24,7 @@ import (
 	"time"
 
 	"golang.org/x/mod/semver"
+	"golang.org/x/sys/execabs"
 
 	"github.com/kortschak/ugbt/internal/browser"
 	"github.com/kortschak/ugbt/internal/modrepo"
@@ -474,7 +474,7 @@ func (u *ugbt) installStd(ctx context.Context, path, version string, verbose, co
 	if verbose {
 		stderr = os.Stderr
 	}
-	cmd := exec.CommandContext(ctx, version, "download")
+	cmd := execabs.CommandContext(ctx, version, "download")
 	cmd.Dir = u.wd
 	cmd.Stderr = stderr
 	err = cmd.Run()
@@ -636,8 +636,8 @@ func (u *ugbt) goenv(ctx context.Context, name string) (string, error) {
 }
 
 // cmd is a go command runner helper.
-func (u *ugbt) cmd(ctx context.Context, stdout, stderr io.Writer, args ...string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, "go", args...)
+func (u *ugbt) cmd(ctx context.Context, stdout, stderr io.Writer, args ...string) *execabs.Cmd {
+	cmd := execabs.CommandContext(ctx, "go", args...)
 	cmd.Dir = u.wd
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
