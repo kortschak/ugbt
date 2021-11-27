@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/mod/semver"
 
+	"github.com/kortschak/ugbt/internal/browser"
 	"github.com/kortschak/ugbt/internal/modrepo"
 	"github.com/kortschak/ugbt/internal/tool"
 )
@@ -223,6 +224,8 @@ func (i *install) Run(ctx context.Context, args ...string) error {
 // repo implements the repo command.
 type repo struct {
 	*ugbt
+
+	Open bool `flag:"o" help:"open the repo url in a browser instead of printing it."`
 }
 
 func (r *repo) Name() string      { return "repo" }
@@ -246,7 +249,9 @@ func (r *repo) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(url)
+	if !r.Open || !browser.Open(url) {
+		fmt.Println(url)
+	}
 	return nil
 }
 
