@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 	"golang.org/x/sys/execabs"
 
@@ -519,6 +520,12 @@ func (t *ugbt) availableVersions(ctx context.Context, mod string) ([]info, error
 	if mod == "std" {
 		return t.stdInfo(ctx)
 	}
+
+	mod, err := module.EscapePath(mod)
+	if err != nil {
+		return nil, err
+	}
+
 	proxies, err := t.proxies(ctx)
 	if err != nil {
 		return nil, err
