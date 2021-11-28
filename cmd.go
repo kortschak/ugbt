@@ -24,6 +24,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/semver"
 	"golang.org/x/sys/execabs"
 
@@ -127,7 +128,7 @@ func (u *ugbt) commands() []tool.Application {
 type list struct {
 	*ugbt
 
-	All bool `flag:"all" help:"list all available versions not just version newer than the installed executable"`
+	All bool `flag:"all" help:"list all versions not just unretracted and newer than the installed executable"`
 }
 
 func (l *list) Name() string      { return "list" }
@@ -136,9 +137,10 @@ func (l *list) ShortHelp() string { return "runs the ugbt list command" }
 func (l *list) DetailedHelp(f *flag.FlagSet) {
 	fmt.Fprint(f.Output(), `
 The list command prints a list of available versions for the queried
-executable. If the -all flag is given, all versions including versions
-older that the current executable are printed. If an executable path is
-not provided, ugbt will print ugbt version information.
+executable including any retraction details. If the -all flag is given,
+all versions including versions older that the current executable are
+printed. If an executable path is not provided, ugbt will print ugbt
+version information.
 
 `)
 	f.PrintDefaults()
@@ -175,11 +177,21 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 			}
 			break
 		}
-		if !v.Time.IsZero() {
-			fmt.Fprintf(w, "%s\t%s\n", v.Version, v.Time.Format(format))
-		} else {
-			fmt.Fprintf(w, "%s\n", v.Version)
+		if !l.All && v.isRetracted {
+			continue
 		}
+		fmt.Fprintf(w, "%s", v.Version)
+		if !v.Time.IsZero() {
+			fmt.Fprintf(w, "\t%s", v.Time.Format(format))
+		}
+		if v.isRetracted {
+			if v.retrationRationale != "" {
+				fmt.Fprintf(w, "\tretracted: %s", v.retrationRationale)
+			} else {
+				fmt.Fprint(w, "\tretracted")
+			}
+		}
+		fmt.Fprintln(w)
 	}
 	return w.Flush()
 }
@@ -495,8 +507,10 @@ func (u *ugbt) installStd(ctx context.Context, path, version string, verbose, co
 }
 
 type info struct {
-	Version string
-	Time    time.Time
+	Version            string
+	Time               time.Time
+	isRetracted        bool
+	retrationRationale string
 }
 
 // availableVersions returns the available semver versions from the
@@ -510,8 +524,11 @@ func (t *ugbt) availableVersions(ctx context.Context, mod string) ([]info, error
 		return nil, err
 	}
 
-	var versions []info
-	var cli http.Client
+	var (
+		versions    []info
+		cli         http.Client
+		retractions []*modfile.Retract
+	)
 	for _, p := range proxies {
 		u, err := url.Parse(p)
 		if err != nil {
@@ -530,15 +547,32 @@ func (t *ugbt) availableVersions(ctx context.Context, mod string) ([]info, error
 
 		sc := bufio.NewScanner(resp.Body)
 		for sc.Scan() {
-			u.Path = path.Join(mod, "@v", sc.Text()+".info")
-			i, err := t.info(ctx, u.String())
+			u.Path = path.Join(mod, "@v", sc.Text())
+			url := u.String()
+
+			i, err := t.info(ctx, url)
 			if err != nil {
 				return nil, err
 			}
 			versions = append(versions, i)
+
+			r, err := t.retractions(ctx, url)
+			if err != nil {
+				return nil, err
+			}
+			retractions = append(retractions, r...)
 		}
 	}
-	return unique(versions), nil
+	versions = unique(versions)
+	for i, v := range versions {
+		for _, r := range retractions {
+			if semver.Compare(v.Version, r.Low) >= 0 && semver.Compare(v.Version, r.High) <= 0 {
+				versions[i].isRetracted = true
+				versions[i].retrationRationale = r.Rationale
+			}
+		}
+	}
+	return versions, nil
 }
 
 // stdInfo returns the information for a Go standard library versions.
@@ -572,7 +606,7 @@ func (u *ugbt) stdInfo(ctx context.Context) ([]info, error) {
 // info returns the information for a version recorded by a Go proxy.
 func (u *ugbt) info(ctx context.Context, version string) (info, error) {
 	var cli http.Client
-	req, err := http.NewRequestWithContext(ctx, "GET", version, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", version+".info", nil)
 	if err != nil {
 		return info{}, err
 	}
@@ -592,6 +626,33 @@ func (u *ugbt) info(ctx context.Context, version string) (info, error) {
 	var i info
 	err = json.Unmarshal(buf.Bytes(), &i)
 	return i, err
+}
+
+// retractions returns any retractions noted in the version's modfile.
+func (u *ugbt) retractions(ctx context.Context, version string) ([]*modfile.Retract, error) {
+	var cli http.Client
+	req, err := http.NewRequestWithContext(ctx, "GET", version+".mod", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := cli.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("query proxy: %s", resp.Status)
+	}
+	defer resp.Body.Close()
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	f, err := modfile.Parse(version+".mod", buf.Bytes(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return f.Retract, nil
 }
 
 // unique returns version lexically sorted in descending version order
