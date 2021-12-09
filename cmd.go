@@ -68,10 +68,10 @@ func newUggboot(name, wd string, env []string) *ugbt {
 func (u *ugbt) Name() string { return u.name }
 
 // Usage implements tool.Application returning empty extra argument usage.
-func (u *ugbt) Usage() string { return "<command> [command-flags] [command-args]" }
+func (*ugbt) Usage() string { return "<command> [command-flags] [command-args]" }
 
 // ShortHelp implements tool.Application returning the main binary help.
-func (u *ugbt) ShortHelp() string {
+func (*ugbt) ShortHelp() string {
 	return "The Ugg boot tool."
 }
 
@@ -132,10 +132,10 @@ type list struct {
 	All bool `flag:"all" help:"list all versions not just unretracted and newer than the installed executable"`
 }
 
-func (l *list) Name() string      { return "list" }
-func (l *list) Usage() string     { return "[/path/to/go/executable]" }
-func (l *list) ShortHelp() string { return "runs the ugbt list command" }
-func (l *list) DetailedHelp(f *flag.FlagSet) {
+func (*list) Name() string      { return "list" }
+func (*list) Usage() string     { return "[/path/to/go/executable]" }
+func (*list) ShortHelp() string { return "runs the ugbt list command" }
+func (*list) DetailedHelp(f *flag.FlagSet) {
 	fmt.Fprint(f.Output(), `
 The list command prints a list of available versions for the queried
 executable including any retraction details. If the -all flag is given,
@@ -216,10 +216,10 @@ type install struct {
 	Commands bool `flag:"x" help:"print the commands run by the go tool."`
 }
 
-func (i *install) Name() string      { return "install" }
-func (i *install) Usage() string     { return "[/path/to/go/executable] <version>" }
-func (i *install) ShortHelp() string { return "runs the ugbt install command" }
-func (i *install) DetailedHelp(f *flag.FlagSet) {
+func (*install) Name() string      { return "install" }
+func (*install) Usage() string     { return "[/path/to/go/executable] <version>" }
+func (*install) ShortHelp() string { return "runs the ugbt install command" }
+func (*install) DetailedHelp(f *flag.FlagSet) {
 	fmt.Fprint(f.Output(), `
 The install command reinstalls the executable at the provided path using
 go install. Any valid version may be used including "latest". See 'go help get'.
@@ -261,10 +261,10 @@ type repo struct {
 	Open bool `flag:"o" help:"open the repo url in a browser instead of printing it."`
 }
 
-func (r *repo) Name() string      { return "repo" }
-func (r *repo) Usage() string     { return "[/path/to/go/executable]" }
-func (r *repo) ShortHelp() string { return "runs the ugbt repo command" }
-func (r *repo) DetailedHelp(f *flag.FlagSet) {
+func (*repo) Name() string      { return "repo" }
+func (*repo) Usage() string     { return "[/path/to/go/executable]" }
+func (*repo) ShortHelp() string { return "runs the ugbt repo command" }
+func (*repo) DetailedHelp(f *flag.FlagSet) {
 	fmt.Fprint(f.Output(), `
 The repo command prints the source repo for the executable. If an executable
 path is not provided, ugbt will print the ugbt repo.
@@ -307,10 +307,10 @@ type version struct {
 	Verbose bool `flag:"v" help:"verbose output"`
 }
 
-func (v *version) Name() string      { return "version" }
-func (v *version) Usage() string     { return "" }
-func (v *version) ShortHelp() string { return "print the ugbt version information" }
-func (v *version) DetailedHelp(f *flag.FlagSet) {
+func (*version) Name() string      { return "version" }
+func (*version) Usage() string     { return "" }
+func (*version) ShortHelp() string { return "print the ugbt version information" }
+func (*version) DetailedHelp(f *flag.FlagSet) {
 	f.PrintDefaults()
 }
 
