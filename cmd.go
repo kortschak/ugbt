@@ -120,6 +120,7 @@ func (u *ugbt) commands() []tool.Application {
 		&list{ugbt: u},
 		&install{ugbt: u},
 		&repo{ugbt: u},
+		&bugs{ugbt: u},
 		&version{ugbt: u},
 		&help{},
 	}
@@ -289,11 +290,57 @@ func (r *repo) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	url, err := modrepo.URL(ctx, mod)
+	url, _, err := modrepo.URL(ctx, mod)
 	if err != nil {
 		return err
 	}
 	if !r.Open || !browser.Open(url) {
+		fmt.Println(url)
+	}
+	return nil
+}
+
+// bugs implements the bugs command.
+type bugs struct {
+	*ugbt
+
+	Open bool `flag:"o" help:"open the issues url in a browser instead of printing it."`
+}
+
+func (*bugs) Name() string      { return "bugs" }
+func (*bugs) Usage() string     { return "[/path/to/go/executable]" }
+func (*bugs) ShortHelp() string { return "runs the ugbt bugs command" }
+func (*bugs) DetailedHelp(f *flag.FlagSet) {
+	fmt.Fprint(f.Output(), `
+The bugs command prints the URL for issues for the executable. If an executable
+path is not provided, ugbt will print the ugbt bugs. If the issues URL is not
+known, the source repo URL is printed.
+
+`)
+	f.PrintDefaults()
+}
+
+// Run runs the ugbt bugs command.
+func (b *bugs) Run(ctx context.Context, args ...string) error {
+	var exe string
+	switch len(args) {
+	case 0:
+		// Work on ugbt.
+	case 1:
+		exe = args[0]
+	default:
+		return errors.New("bugs requires zero or one argument")
+	}
+
+	_, mod, _, err := b.version(ctx, exe)
+	if err != nil {
+		return err
+	}
+	_, url, err := modrepo.URL(ctx, mod)
+	if err != nil {
+		return err
+	}
+	if !b.Open || !browser.Open(url) {
 		fmt.Println(url)
 	}
 	return nil
@@ -381,7 +428,9 @@ list returns a list of available versions for a Go executable.
 install reinstalls an executable from source based on source location
 information stored in the executable.
 
-repo prints the source code repository for the executable.
+repo prints the source code repository URL for the executable.
+
+bugs prints the issues URL for the executable.
 
 `
 

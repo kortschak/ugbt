@@ -21,39 +21,43 @@ import (
 	"strings"
 )
 
+const (
+	goSourceRepoURL = "https://cs.opensource.google/go/go"
+	goIssuesURL     = "https://github.com/golang/go/issues"
+)
+
 // URL returns the repository corresponding to the module path.
-func URL(ctx context.Context, mod string) (string, error) {
+func URL(ctx context.Context, mod string) (repo, bugs string, _ error) {
 	// The example.com domain can never be real; it is reserved for testing
 	// (https://en.wikipedia.org/wiki/Example.com). Treat it as if it used
 	// GitHub templates.
 	if strings.HasPrefix(mod, "example.com/") {
-		return trimVCSSuffix("https://" + mod), nil
+		repo = trimVCSSuffix("https://" + mod)
+		return repo, repo, nil
 	}
 
 	// standard is the name of the module for the standard library.
 	const standard = "std"
 	if mod == standard {
-		// We are using this for returning a repository for filing
-		// issues, so we don't use the canonical source location
-		// which is https://cs.opensource.google/go/go.
-		const GoSourceRepoURL = "https://github.com/golang/go"
-		return GoSourceRepoURL, nil
+		return goSourceRepoURL, goIssuesURL, nil
 	}
 
-	repo, err := matchStatic(mod)
+	repo, bugsFor, err := matchStatic(mod)
 	if err != nil {
 		meta, err := fetchMeta(ctx, mod)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		repo = strings.TrimSuffix(meta.repoURL, "/")
+		_, bugsFor, _ = matchStatic(removeHTTPScheme(meta.repoURL))
 	} else {
 		repo = trimVCSSuffix("https://" + repo)
 	}
 	if strings.HasPrefix(mod, "golang.org/") {
-		repo = adjustGoRepoInfo(repo, mod)
+		repo, bugs = adjustGoRepoInfo(repo, mod)
+		return repo, bugs, nil
 	}
-	return repo, nil
+	return repo, bugsFor(repo), nil
 }
 
 // csNonXRepos is a set of repos hosted at https://cs.opensource.google/go,
@@ -99,7 +103,7 @@ var csXRepos = map[string]bool{
 	"x/xerrors":    true,
 }
 
-func adjustGoRepoInfo(repo string, modulePath string) string {
+func adjustGoRepoInfo(repo string, modulePath string) (src, bugs string) {
 	suffix := strings.TrimPrefix(modulePath, "golang.org/")
 
 	// Validate that this is a repo that exists on
@@ -111,18 +115,18 @@ func adjustGoRepoInfo(repo string, modulePath string) string {
 	}
 	if strings.HasPrefix(suffix, "x/") {
 		if !csXRepos[suffix] {
-			return repo
+			return repo, repo
 		}
 	} else if !csNonXRepos[suffix] {
-		return repo
+		return repo, repo
 	}
 
-	return fmt.Sprintf("https://cs.opensource.google/go/%s", suffix)
+	return fmt.Sprintf("https://cs.opensource.google/go/%s", suffix), goIssuesURL
 }
 
 // matchStatic matches the given module or repo path against a list of known
 // patterns. It returns the repo name if there is a match.
-func matchStatic(moduleOrRepoPath string) (repo string, _ error) {
+func matchStatic(moduleOrRepoPath string) (repo string, bugs func(string) string, _ error) {
 	for _, pat := range patterns {
 		matches := pat.re.FindStringSubmatch(moduleOrRepoPath)
 		if matches == nil {
@@ -146,68 +150,86 @@ func matchStatic(moduleOrRepoPath string) (repo string, _ error) {
 		if strings.HasPrefix(repo, "blitiri.com.ar/") {
 			repo = strings.Replace(repo, "/go/", "/git/r/", 1)
 		}
-		return repo, nil
+		return repo, pat.issues, nil
 	}
-	return "", errors.New("not found")
+	noop := func(s string) string { return s }
+	return "", noop, errors.New("not found")
 }
 
-// Patterns for determining repo and URL templates from module paths or repo
+// Patterns for determining repo and URL transformation from module paths or repo
 // URLs. Each regexp must match a prefix of the target string, and must have a
 // group named "repo".
 var patterns = []struct {
 	pattern string // uncompiled regexp
 	re      *regexp.Regexp
+	issues  func(repo string) string
 }{
 	{
 		pattern: `^(?P<repo>github\.com/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/issues", repo) },
 	},
 	{
 		// Assume that any site beginning with "github." works like github.com.
 		pattern: `^(?P<repo>github\.[a-z0-9A-Z.-]+/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)(\.git|$)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/issues", repo) },
 	},
 	{
 		pattern: `^(?P<repo>bitbucket\.org/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/issues", repo) },
 	},
 	{
 		pattern: `^(?P<repo>gitlab\.com/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/-/issues", repo) },
 	},
 	{
 		// Assume that any site beginning with "gitlab." works like gitlab.com.
 		pattern: `^(?P<repo>gitlab\.[a-z0-9A-Z.-]+/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)(\.git|$)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/-/issues", repo) },
 	},
 	{
 		pattern: `^(?P<repo>gitee\.com/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)(\.git|$)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/issues", repo) },
 	},
 	{
 		pattern: `^(?P<repo>git\.sr\.ht/~[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)`,
+		issues:  func(repo string) string { return strings.Replace(repo, "git.sr.ht", "todo.sr.ht", 1) },
 	},
 	{
 		pattern: `^(?P<repo>git\.fd\.io/[a-z0-9A-Z_.\-]+)`,
+		issues:  func(repo string) string { return repo },
 	},
 	{
 		pattern: `^(?P<repo>git\.pirl\.io/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)`,
+		issues:  func(repo string) string { return repo },
 	},
 	{
 		pattern: `^(?P<repo>gitea\.com/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)(\.git|$)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/issues", repo) },
 	},
 	{
 		// Assume that any site beginning with "gitea." works like gitea.com.
 		pattern: `^(?P<repo>gitea\.[a-z0-9A-Z.-]+/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)(\.git|$)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/issues", repo) },
 	},
 	{
 		pattern: `^(?P<repo>go\.isomorphicgo\.org/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)(\.git|$)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/issues", repo) },
 	},
 	{
 		pattern: `^(?P<repo>git\.openprivacy\.ca/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)(\.git|$)`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s/issues", repo) },
 	},
 	{
 		pattern: `^(?P<repo>gogs\.[a-z0-9A-Z.-]+/[a-z0-9A-Z_.\-]+/[a-z0-9A-Z_.\-]+)(\.git|$)`,
+		issues:  func(repo string) string { return repo },
 	},
 	{
 		pattern: `^(?P<repo>dmitri\.shuralyov\.com\/.+)$`,
+		issues:  func(repo string) string { return fmt.Sprintf("%s$issues", repo) },
 	},
 	{
 		pattern: `^(?P<repo>blitiri\.com\.ar/go/.+)$`,
+		issues:  func(repo string) string { return "mailto:albertito@blitiri.com.ar" },
 	},
 
 	// Patterns that match the general go command pattern, where they must have
@@ -215,15 +237,18 @@ var patterns = []struct {
 	// there is no ".git".
 	{
 		pattern: `^(?P<repo>[^.]+\.googlesource\.com/[^.]+)(\.git|$)`,
+		issues:  func(repo string) string { return repo },
 	},
 	{
 		pattern: `^(?P<repo>git\.apache\.org/[^.]+)(\.git|$)`,
+		issues:  func(repo string) string { return repo },
 	},
 	// General syntax for the go command. We can extract the repo and directory, but
 	// we don't know the URL templates.
 	// Must be last in this list.
 	{
 		pattern: `(?P<repo>([a-z0-9.\-]+\.)+[a-z0-9.\-]+(:[0-9]+)?(/~?[A-Za-z0-9_.\-]+)+?)\.(bzr|fossil|git|hg|svn)`,
+		issues:  func(repo string) string { return repo },
 	},
 }
 

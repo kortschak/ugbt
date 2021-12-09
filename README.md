@@ -7,6 +7,7 @@ It provides a simple way to update Go executables and list available versions us
 - list: print a list of available versions for a Go executable.
 - install: reinstall or update an executable from source.
 - repo: print the source code repository for the executable.
+- bugs: print the issues link for the executable.
 
 ## Installation
 
