@@ -416,22 +416,22 @@ Ugg boot provides a simple way to update Go executables and list
 available versions using module version information embedded in
 the executable.
 
-Available commands are:
-  list: runs the ugbt list command
-  install: runs the ugbt install command
-  repo: runs the ugbt repo command
+Available commands:
+
+  list: print a list of available versions for a Go executable
+
+  install: install an executable from source based on source location
+           information stored in the executable
+
+  repo: print the source code repository URL for the executable
+
+  bugs: print the issues URL for the executable
+
   version: print the ugbt version information
+
   help: output ugbt help information
 
-list returns a list of available versions for a Go executable.
-
-install reinstalls an executable from source based on source location
-information stored in the executable.
-
-repo prints the source code repository URL for the executable.
-
-bugs prints the issues URL for the executable.
-
+Help for each command is provided with the -h flag.
 `
 
 // version returns the Go package path, mod path and version of the an
