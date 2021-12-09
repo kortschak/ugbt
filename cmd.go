@@ -156,7 +156,7 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 	case 1:
 		exe = args[0]
 	default:
-		return errors.New("install requires zero or one argument")
+		return errors.New("list requires zero or one argument")
 	}
 
 	const defaultFormat = "_2 Jan 2006 15:04"
@@ -266,8 +266,8 @@ func (*repo) Usage() string     { return "[/path/to/go/executable]" }
 func (*repo) ShortHelp() string { return "runs the ugbt repo command" }
 func (*repo) DetailedHelp(f *flag.FlagSet) {
 	fmt.Fprint(f.Output(), `
-The repo command prints the source repo for the executable. If an executable
-path is not provided, ugbt will print the ugbt repo.
+The repo command prints the source repo URL for the executable. If an
+executable path is not provided, ugbt will print the ugbt repo.
 
 `)
 	f.PrintDefaults()
@@ -282,7 +282,7 @@ func (r *repo) Run(ctx context.Context, args ...string) error {
 	case 1:
 		exe = args[0]
 	default:
-		return errors.New("install requires zero or one argument")
+		return errors.New("repo requires zero or one argument")
 	}
 
 	_, mod, _, err := r.version(ctx, exe)
