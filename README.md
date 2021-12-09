@@ -54,7 +54,13 @@ $GOBIN/goimports: go1.17.3
 Show the repo for the tool chain.
 ```
 $ ugbt repo go
-https://github.com/golang/go
+https://cs.opensource.google/go/go
+```
+
+Show the bugs page for the tool chain.
+```
+$ ugbt bugs go
+https://github.com/golang/go/issues
 ```
 
 Install gotip.
