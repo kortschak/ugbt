@@ -172,9 +172,10 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 		return err
 	}
 	w := tabwriter.NewWriter(os.Stdout, 0, 8, 2, ' ', tabwriter.DiscardEmptyColumns)
-	for i, v := range versions {
+	var n int
+	for _, v := range versions {
 		if !l.All && semverCompare(v.Version, current) <= 0 {
-			if i == 0 {
+			if n == 0 {
 				fmt.Fprintln(os.Stderr, "no new version")
 			}
 			break
@@ -194,6 +195,7 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 			}
 		}
 		fmt.Fprintln(w)
+		n++
 	}
 	return w.Flush()
 }
