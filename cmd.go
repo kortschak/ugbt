@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"regexp"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -130,7 +131,8 @@ func (u *ugbt) commands() []tool.Application {
 type list struct {
 	*ugbt
 
-	All bool `flag:"all" help:"list all versions not just unretracted and newer than the installed executable"`
+	All        bool   `flag:"all" help:"list all versions not just unretracted and newer than the installed executable"`
+	PreRelease string `flag:"suffix" help:"only print versions with a pre-release matching the regexp pattern"`
 }
 
 func (*list) Name() string      { return "list" }
@@ -160,6 +162,11 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 		return errors.New("list requires zero or one argument")
 	}
 
+	suffix, err := regexp.Compile(l.PreRelease)
+	if err != nil {
+		return err
+	}
+
 	const defaultFormat = "_2 Jan 2006 15:04"
 	format := defaultFormat
 
@@ -181,6 +188,9 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 			break
 		}
 		if !l.All && v.isRetracted {
+			continue
+		}
+		if !suffix.MatchString(semver.Prerelease(v.Version)) {
 			continue
 		}
 		fmt.Fprintf(w, "%s", v.Version)
