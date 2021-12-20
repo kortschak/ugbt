@@ -653,66 +653,56 @@ func (t *ugbt) availableVersions(ctx context.Context, mod, current string, all b
 
 // stdInfo returns the information for a Go standard library versions.
 func (u *ugbt) stdInfo(ctx context.Context) ([]info, error) {
-	var cli http.Client
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://go.dev/dl/?mode=json&include=all", nil)
+	buf, err := get(ctx, "https://go.dev/dl/?mode=json&include=all")
 	if err != nil {
-		return nil, err
-	}
-	resp, err := cli.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
-		return nil, fmt.Errorf("query proxy: %w", statusError{status: resp.Status, code: resp.StatusCode})
-	}
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, resp.Body)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("query proxy: %w", err)
 	}
 	var versions []info
-	err = json.Unmarshal(buf.Bytes(), &versions)
+	err = json.Unmarshal(buf, &versions)
+	if err != nil {
+		return nil, fmt.Errorf("invalid version information: %w", err)
+	}
 	sort.Slice(versions, func(i, j int) bool {
 		return semverCompare(versions[i].Version, versions[j].Version) > 0
 	})
-	return versions, err
+	return versions, nil
 }
 
 // info returns the information for a version recorded by a Go proxy.
 func (u *ugbt) info(ctx context.Context, version string) (info, error) {
-	var cli http.Client
-	req, err := http.NewRequestWithContext(ctx, "GET", version+".info", nil)
+	buf, err := get(ctx, version+".info")
 	if err != nil {
-		return info{}, err
-	}
-	resp, err := cli.Do(req)
-	if err != nil {
-		return info{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
-		return info{}, fmt.Errorf("query proxy: %w", statusError{status: resp.Status, code: resp.StatusCode})
-	}
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, resp.Body)
-	if err != nil {
-		return info{}, err
+		return info{}, fmt.Errorf("query proxy: %w", err)
 	}
 	var i info
-	err = json.Unmarshal(buf.Bytes(), &i)
-	return i, err
+	err = json.Unmarshal(buf, &i)
+	if err != nil {
+		return info{}, fmt.Errorf("invalid version information: %w", err)
+	}
+	return i, nil
 }
 
 // retractions returns any retractions noted in the version's modfile.
 func (u *ugbt) retractions(ctx context.Context, version string) ([]*modfile.Retract, error) {
-	var cli http.Client
-	req, err := http.NewRequestWithContext(ctx, "GET", version+".mod", nil)
+	buf, err := get(ctx, version+".mod")
+	if err != nil {
+		return nil, fmt.Errorf("query proxy: %w", err)
+	}
+	f, err := modfile.Parse(version+".mod", buf, nil)
+	if err != nil {
+		return nil, fmt.Errorf("invalid modfile: %w", err)
+	}
+	return f.Retract, nil
+}
+
+// get returns the body of a GET request to the provided URL. Any non 200
+// response status is returned as an error.
+func get(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
+	var cli http.Client
 	resp, err := cli.Do(req)
 	if err != nil {
 		return nil, err
@@ -720,18 +710,14 @@ func (u *ugbt) retractions(ctx context.Context, version string) ([]*modfile.Retr
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		io.Copy(io.Discard, resp.Body)
-		return nil, fmt.Errorf("query proxy: %w", statusError{status: resp.Status, code: resp.StatusCode})
+		return nil, statusError{status: resp.Status, code: resp.StatusCode}
 	}
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	f, err := modfile.Parse(version+".mod", buf.Bytes(), nil)
-	if err != nil {
-		return nil, err
-	}
-	return f.Retract, nil
+	return buf.Bytes(), nil
 }
 
 // statusError is an HTTP status error.
