@@ -174,7 +174,7 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
-	versions, err := l.availableVersions(ctx, mod)
+	versions, err := l.availableVersions(ctx, mod, current, l.All)
 	if err != nil {
 		return err
 	}
@@ -576,8 +576,9 @@ type info struct {
 }
 
 // availableVersions returns the available semver versions from the
-// $GOPROXY version database.
-func (t *ugbt) availableVersions(ctx context.Context, mod string) ([]info, error) {
+// $GOPROXY version database. Only versions at or after the current
+// version are returned unless all is true.
+func (t *ugbt) availableVersions(ctx context.Context, mod, current string, all bool) ([]info, error) {
 	if mod == "std" {
 		return t.stdInfo(ctx)
 	}
@@ -614,8 +615,15 @@ func (t *ugbt) availableVersions(ctx context.Context, mod string) ([]info, error
 		defer resp.Body.Close()
 
 		sc := bufio.NewScanner(resp.Body)
+		var list []string
 		for sc.Scan() {
-			u.Path = path.Join(mod, "@v", sc.Text())
+			version := sc.Text()
+			if all || semverCompare(version, current) >= 0 {
+				list = append(list, version)
+			}
+		}
+		for _, version := range list {
+			u.Path = path.Join(mod, "@v", version)
 			url := u.String()
 
 			i, err := t.info(ctx, url)
