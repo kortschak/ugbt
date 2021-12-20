@@ -145,6 +145,7 @@ executable including any retraction details. If the -all flag is given,
 all versions including versions older that the current executable are
 printed. If an executable path is not provided, ugbt will print ugbt
 version information.
+Executables in modules matching GOPRIVATE or GONOPROXY are not handled.
 
 `)
 	f.PrintDefaults()
@@ -588,6 +589,19 @@ func (t *ugbt) availableVersions(ctx context.Context, mod, current string, all b
 		return nil, err
 	}
 
+	for _, reason := range []string{
+		"GOPRIVATE",
+		"GONOPROXY",
+	} {
+		private, err := t.isPrivate(ctx, mod, reason)
+		if err != nil {
+			return nil, err
+		}
+		if private {
+			return nil, fmt.Errorf("module %s matches %s", mod, reason)
+		}
+	}
+
 	proxies, err := t.proxies(ctx)
 	if err != nil {
 		return nil, err
@@ -628,6 +642,13 @@ func (t *ugbt) availableVersions(ctx context.Context, mod, current string, all b
 
 			i, err := t.info(ctx, url)
 			if err != nil {
+				var status statusError
+				if errors.As(err, &status) {
+					switch status.code {
+					case http.StatusNotFound, http.StatusGone:
+						continue
+					}
+				}
 				return nil, err
 			}
 			versions = append(versions, i)
@@ -764,6 +785,15 @@ func (u *ugbt) proxies(ctx context.Context) ([]string, error) {
 		proxies = append(proxies, p)
 	}
 	return proxies, nil
+}
+
+// isPrivate returns whether the module matches any GOPRIVATE or GONOPROXY pattern.
+func (u *ugbt) isPrivate(ctx context.Context, mod, reason string) (bool, error) {
+	patterns, err := u.goenv(ctx, reason)
+	if err != nil {
+		return false, err
+	}
+	return module.MatchPrefixPatterns(patterns, mod), nil
 }
 
 // goenv returns the requested go env variable.
