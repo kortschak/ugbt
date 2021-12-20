@@ -198,8 +198,8 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 			fmt.Fprintf(w, "\t%s", v.Time.Format(format))
 		}
 		if v.isRetracted {
-			if v.retrationRationale != "" {
-				fmt.Fprintf(w, "\tretracted: %s", v.retrationRationale)
+			if v.retractionRationale != "" {
+				fmt.Fprintf(w, "\tretracted: %s", v.retractionRationale)
 			} else {
 				fmt.Fprint(w, "\tretracted")
 			}
@@ -569,10 +569,10 @@ func (u *ugbt) installStd(ctx context.Context, path, version string, verbose, co
 }
 
 type info struct {
-	Version            string
-	Time               time.Time
-	isRetracted        bool
-	retrationRationale string
+	Version             string
+	Time                time.Time
+	isRetracted         bool
+	retractionRationale string
 }
 
 // availableVersions returns the available semver versions from the
@@ -644,7 +644,7 @@ func (t *ugbt) availableVersions(ctx context.Context, mod, current string, all b
 		for _, r := range retractions {
 			if semver.Compare(v.Version, r.Low) >= 0 && semver.Compare(v.Version, r.High) <= 0 {
 				versions[i].isRetracted = true
-				versions[i].retrationRationale = r.Rationale
+				versions[i].retractionRationale = r.Rationale
 			}
 		}
 	}
