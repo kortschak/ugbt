@@ -662,10 +662,11 @@ func (u *ugbt) stdInfo(ctx context.Context) ([]info, error) {
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("query proxy: %s", resp.Status)
-	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
+		return nil, fmt.Errorf("query proxy: %w", statusError{status: resp.Status, code: resp.StatusCode})
+	}
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, resp.Body)
 	if err != nil {
@@ -690,10 +691,11 @@ func (u *ugbt) info(ctx context.Context, version string) (info, error) {
 	if err != nil {
 		return info{}, err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return info{}, fmt.Errorf("query proxy: %s", resp.Status)
-	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
+		return info{}, fmt.Errorf("query proxy: %w", statusError{status: resp.Status, code: resp.StatusCode})
+	}
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, resp.Body)
 	if err != nil {
@@ -715,10 +717,11 @@ func (u *ugbt) retractions(ctx context.Context, version string) ([]*modfile.Retr
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("query proxy: %s", resp.Status)
-	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, resp.Body)
+		return nil, fmt.Errorf("query proxy: %w", statusError{status: resp.Status, code: resp.StatusCode})
+	}
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, resp.Body)
 	if err != nil {
@@ -730,6 +733,14 @@ func (u *ugbt) retractions(ctx context.Context, version string) ([]*modfile.Retr
 	}
 	return f.Retract, nil
 }
+
+// statusError is an HTTP status error.
+type statusError struct {
+	status string
+	code   int
+}
+
+func (e statusError) Error() string { return e.status }
 
 // unique returns version lexically sorted in descending version order
 // and with repeated elements omitted.
