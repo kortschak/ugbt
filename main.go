@@ -11,6 +11,7 @@
 //   install: install an executable from source based on source location
 //            information stored in the executable.
 //   repo: print the source code repository for the executable.
+//   bugs: print the issues link for the executable.
 //   version: print the ugbt version information
 //   help: output ugbt help information
 //
