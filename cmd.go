@@ -183,9 +183,6 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 	var n int
 	for _, v := range versions {
 		if !l.All && semverCompare(v.Version, current) <= 0 {
-			if n == 0 {
-				fmt.Fprintln(os.Stderr, "no new version")
-			}
 			break
 		}
 		if !l.All && v.isRetracted {
@@ -207,6 +204,9 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 		}
 		fmt.Fprintln(w)
 		n++
+	}
+	if n == 0 {
+		fmt.Fprintln(os.Stderr, "no new version")
 	}
 	return w.Flush()
 }
