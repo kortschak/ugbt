@@ -1,5 +1,7 @@
 # Ugg Boot
 
+![Ugg boot](uggboot.png)
+
 Ugg boot is a tool for people wanting to have some comfort in their lives.
 
 It provides a simple way to update Go executables and list available versions using module version information embedded in the executable.
