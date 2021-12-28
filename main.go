@@ -10,6 +10,8 @@
 //   list: return a list of available versions for a Go executable.
 //   install: install an executable from source based on source location
 //            information stored in the executable.
+//   update: update an executable to the latest release if it is newer
+//           than the installed version.
 //   repo: print the source code repository for the executable.
 //   bugs: print the issues link for the executable.
 //   version: print the ugbt version information

@@ -120,6 +120,7 @@ func (u *ugbt) commands() []tool.Application {
 	return []tool.Application{
 		&list{ugbt: u},
 		&install{ugbt: u},
+		&update{ugbt: u, PreRelease: "^$"},
 		&repo{ugbt: u},
 		&bugs{ugbt: u},
 		&version{ugbt: u},
@@ -209,6 +210,74 @@ func (l *list) Run(ctx context.Context, args ...string) error {
 		fmt.Fprintln(os.Stderr, "no new version")
 	}
 	return w.Flush()
+}
+
+// update implements the update command.
+type update struct {
+	*ugbt
+
+	PreRelease string `flag:"suffix" help:"only update to versions with a pre-release matching the regexp pattern"`
+	Verbose    bool   `flag:"v" help:"print the names of packages as they are compiled."`
+	Commands   bool   `flag:"x" help:"print the commands run by the go tool."`
+}
+
+func (*update) Name() string      { return "update" }
+func (*update) Usage() string     { return "[/path/to/go/executable]" }
+func (*update) ShortHelp() string { return "runs the ugbt update command" }
+func (*update) DetailedHelp(f *flag.FlagSet) {
+	fmt.Fprint(f.Output(), `
+The update command updates the executable to the latest version matching
+the pre-release suffix pattern. If no newer version is available update
+is a no-op. By default it will update to the latest release. If no
+executable is specified ugbt will be updated.
+
+`)
+	f.PrintDefaults()
+}
+
+// Run runs the ugbt update command.
+func (u *update) Run(ctx context.Context, args ...string) error {
+	var exe string
+	switch len(args) {
+	case 0:
+		// Work on ugbt.
+	case 1:
+		exe = args[0]
+	default:
+		return errors.New("update requires zero or one argument")
+	}
+
+	suffix, err := regexp.Compile(u.PreRelease)
+	if err != nil {
+		return err
+	}
+
+	path, mod, current, err := u.version(ctx, exe)
+	if err != nil {
+		return err
+	}
+	versions, err := u.availableVersions(ctx, mod, current, false)
+	if err != nil {
+		return err
+	}
+	for _, v := range versions {
+		if semverCompare(v.Version, current) <= 0 {
+			break
+		}
+		if v.isRetracted {
+			continue
+		}
+		if !suffix.MatchString(semver.Prerelease(v.Version)) {
+			continue
+		}
+		if exe == "" {
+			exe = "ugbt"
+		}
+		fmt.Fprintf(os.Stderr, "update %s to %s\n", exe, v.Version)
+		return u.install(ctx, path, mod, v.Version, u.Verbose, u.Commands)
+	}
+	fmt.Fprintln(os.Stderr, "no new version")
+	return nil
 }
 
 func semverCompare(v, w string) int {
@@ -435,6 +504,9 @@ Available commands:
 
   install: install an executable from source based on source location
            information stored in the executable
+
+  update: update an executable to the latest release if it is newer
+          than the installed version
 
   repo: print the source code repository URL for the executable
 
