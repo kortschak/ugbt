@@ -219,6 +219,7 @@ type update struct {
 	PreRelease string `flag:"suffix" help:"only update to versions with a pre-release matching the regexp pattern"`
 	Verbose    bool   `flag:"v" help:"print the names of packages as they are compiled."`
 	Commands   bool   `flag:"x" help:"print the commands run by the go tool."`
+	DryRun     bool   `flag:"dry-run" help:"don't install anything, just print what would be installed."`
 }
 
 func (*update) Name() string      { return "update" }
@@ -274,6 +275,9 @@ func (u *update) Run(ctx context.Context, args ...string) error {
 			exe = "ugbt"
 		}
 		fmt.Fprintf(os.Stderr, "update %s to %s\n", exe, v.Version)
+		if u.DryRun {
+			return nil
+		}
 		return u.install(ctx, path, mod, v.Version, u.Verbose, u.Commands)
 	}
 	fmt.Fprintln(os.Stderr, "no new version")
